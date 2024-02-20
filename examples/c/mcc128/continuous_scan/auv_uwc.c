@@ -13,7 +13,7 @@
     Description:
         Continuously acquires blocks of analog input data for a
         user-specified group of channels until the acquisition is
-        stopped by the user.  The last sample of data for each channel
+        stopped by the user. The last sample of data for each channel
         is displayed for each block of data received from the device.
 
 *****************************************************************************/

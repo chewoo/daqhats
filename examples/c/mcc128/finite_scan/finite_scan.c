@@ -55,7 +55,9 @@ int main(void)
     double scan_rate = 1000.0;
     double actual_scan_rate = 0.0;
     mcc128_a_in_scan_actual_rate(num_channels, scan_rate, &actual_scan_rate);
-
+    // This function does not perform any actions with a board, it simply calculates the rate.
+    // check the actual scan rate
+    // actual_scan_rate = 0 -> error
     uint32_t options = OPTS_DEFAULT;
 
     uint16_t read_status = 0;
@@ -105,6 +107,10 @@ int main(void)
     // Configure and start the scan.
     result = mcc128_a_in_scan_start(address, channel_mask, samples_per_channel,
         scan_rate, options);
+    // run the scan in the background
+    // options = OPTS_DEFAULT
+    // finite scan -> store the samples in the buffer
+    // continuous scan -> store the samples in the circular buffer
     STOP_ON_ERROR(result);
 
     printf("Starting scan ... Press ENTER to stop\n\n");
@@ -126,14 +132,17 @@ int main(void)
         // Read the specified number of samples.
         result = mcc128_a_in_scan_read(address, &read_status, read_request_size,
             timeout, read_buf, buffer_size, &samples_read_per_channel);
+        
         STOP_ON_ERROR(result);
         if (read_status & STATUS_HW_OVERRUN)
         {
+            // Hardware overrun, buffer lost data
             printf("\n\nHardware overrun\n");
             break;
         }
         else if (read_status & STATUS_BUFFER_OVERRUN)
         {
+            // Buffer overrun, user lost data
             printf("\n\nBuffer overrun\n");
             break;
         }

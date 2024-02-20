@@ -36,9 +36,13 @@ int main()
     int samples_per_channel = 0;
     int sample_interval = 500;  // ms
     uint8_t input_mode = A_IN_MODE_SE;
+    // input_mode = 0 (single-ended)
+    // input_mode = 1 (differential)
     uint8_t input_range = A_IN_RANGE_BIP_10V;
 
     int mcc128_num_channels = mcc128_info()->NUM_AI_CHANNELS[input_mode];
+    // NUM_AI_CHANNELS[0] = 8 (The number of analog input channels for single-ended mode)
+    // mcc128_num_channels = 8
 
     // Ensure low_chan and high_chan are valid
     if ((low_chan >= mcc128_num_channels) ||
@@ -63,14 +67,17 @@ int main()
 
     // Open a connection to each device
     result = mcc128_open(address);
+    // Only pass when the result is ResultSuccess
     STOP_ON_ERROR(result);
 
+    // Set the analog input mode and range
     result = mcc128_a_in_mode_write(address, input_mode);
     STOP_ON_ERROR(result);
 
     result = mcc128_a_in_range_write(address, input_range);
     STOP_ON_ERROR(result);
 
+    // Display the header row for the data table
     convert_input_mode_to_string(input_mode, mode_string);
     convert_input_range_to_string(input_range, range_string);
 
