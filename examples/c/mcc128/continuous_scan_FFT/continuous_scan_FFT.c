@@ -13,11 +13,30 @@
     Description:
         Continuously acquires blocks of analog input data for a
         user-specified group of channels until the acquisition is
-        stopped by the user.  The last sample of data for each channel
+        stopped by the user. The last sample of data for each channel
         is displayed for each block of data received from the device.
 
 *****************************************************************************/
 #include "../../daqhats_utils.h"
+#include <fftw3.h>
+
+// Function to calculate frequency from FFT output
+double calculateFrequency(fftw_complex* fft_output, int sample_rate, int signal_size) {
+    // Find the index of maximum amplitude in FFT output
+    int max_index = 0;
+    double max_magnitude = 0.0;
+    for (int i = 0; i < signal_size / 2; ++i) {
+        double magnitude = fft_output[i][0] * fft_output[i][0] + fft_output[i][1] * fft_output[i][1];
+        if (magnitude > max_magnitude) {
+            max_magnitude = magnitude;
+            max_index = i;
+        }
+    }
+
+    // Calculate frequency corresponding to the index
+    double frequency = static_cast<double>(max_index) * sample_rate / signal_size;
+    return frequency;
+}
 
 int main(void)
 {
@@ -36,9 +55,9 @@ int main(void)
     // mcc128_a_in_scan_start to specify the channels to acquire.
     // The functions below, will parse the channel mask into a
     // character string for display purposes.
-    uint8_t channel_mask = {CHAN0 | CHAN1 | CHAN2 | CHAN3};
+    uint8_t channel_mask = {CHAN0};
     uint8_t input_mode = A_IN_MODE_SE;
-    uint8_t input_range = A_IN_RANGE_BIP_10V;
+    uint8_t input_range = A_IN_RANGE_BIP_1V;
 
     uint32_t samples_per_channel = 0;
 
@@ -49,7 +68,7 @@ int main(void)
 
     uint32_t internal_buffer_size_samples = 0;
     uint32_t user_buffer_size = 100000 * num_channels;
-    double read_buf[user_buffer_size];
+    double* read_buf = new double[user_buffer_size];
     int total_samples_read = 0;
 
     int32_t read_request_size = READ_ALL_AVAILABLE;
@@ -128,14 +147,14 @@ int main(void)
     printf("\nStarting scan ... Press ENTER to stop\n\n");
 
     // Create the header containing the column names.
-    strcpy(display_header, "Samples Read    Scan Count    ");
-    for (i = 0; i < num_channels; i++)
-    {
-        sprintf(channel_string, "Channel %d   ", channel_array[i]);
-        strcat(display_header, channel_string);
-    }
-    strcat(display_header, "\n");
-    printf("%s", display_header);
+    // strcpy(display_header, "Samples Read    Scan Count    ");
+    // for (i = 0; i < num_channels; i++)
+    // {
+    //     sprintf(channel_string, "Channel %d   ", channel_array[i]);
+    //     strcat(display_header, channel_string);
+    // }
+    // strcat(display_header, "\n");
+    // printf("%s", display_header);
 
     // Continuously update the display value until enter key is pressed
     do
@@ -159,20 +178,31 @@ int main(void)
 
         total_samples_read += samples_read_per_channel;
 
+        // FFT
+        fftw_complex* fft_output = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * samples_read_per_channel);
+        fftw_plan plan = fftw_plan_dft_r2c_1d(samples_read_per_channel, read_buf, fft_output, FFTW_ESTIMATE);
+        fftw_execute(plan); 
+        // Calculate frequency
+        double frequency = calculateFrequency(fft_output, scan_rate, samples_read_per_channel);
+        printf("Frequency: %f\n", frequency);
+
         // Display the last sample for each channel.
-        printf("\r%12.0d    %10.0d ", samples_read_per_channel,
-            total_samples_read);
-        if (samples_read_per_channel > 0)
-        {
-            int index = samples_read_per_channel * num_channels - num_channels;
+        // printf("\r%12.0d    %10.0d ", samples_read_per_channel,
+        //     total_samples_read);
+        // if (samples_read_per_channel > 0)
+        // {
+        //     int index = samples_read_per_channel * num_channels - num_channels;
 
-            for (i = 0; i < num_channels; i++)
-            {
-                printf("%10.5f V", read_buf[index + i]);
-            }
-            fflush(stdout);
-        }
-
+        //     for (i = 0; i < num_channels; i++)
+        //     {
+        //         printf("%10.5f V", read_buf[index + i]);
+        //     }
+        //     fflush(stdout);
+        // }
+        
+        // cleanup
+        fftw_destroy_plan(plan);
+        fftw_free(fft_output);
         usleep(500000);
 
     }
@@ -186,6 +216,7 @@ stop:
     print_error(mcc128_a_in_scan_stop(address));
     print_error(mcc128_a_in_scan_cleanup(address));
     print_error(mcc128_close(address));
+    delete[] read_buf;
 
     return 0;
 }
